@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -11,17 +9,10 @@ from app.services import prices
 router = APIRouter()
 
 
-def _get_valid_price(ticker: str) -> Decimal:
-    price = prices.get_price(ticker)
-    if price == 0:
-        raise HTTPException(status_code=404, detail=f"Unknown ticker: {ticker}")
-    return price
-
-
 @router.get("/quote/{ticker}", response_model=schemas.QuoteResponse)
 def get_quote(ticker: str):
     ticker = ticker.upper()
-    price = _get_valid_price(ticker)
+    price = prices.get_price(ticker)
     return schemas.QuoteResponse(ticker=ticker, price=price)
 
 
@@ -35,7 +26,7 @@ def buy(
         raise HTTPException(status_code=400, detail="Shares must be a positive integer")
 
     ticker = trade.ticker.upper()
-    price = _get_valid_price(ticker)
+    price = prices.get_price(ticker)
     cost = price * trade.shares
 
     if user.cash_balance < cost:
@@ -81,7 +72,7 @@ def sell(
         raise HTTPException(status_code=400, detail="Shares must be a positive integer")
 
     ticker = trade.ticker.upper()
-    price = _get_valid_price(ticker)
+    price = prices.get_price(ticker)
 
     holding = (
         db.query(models.Holding)
