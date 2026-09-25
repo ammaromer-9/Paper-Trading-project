@@ -19,9 +19,12 @@ def test_quote_endpoint_returns_price(client):
     assert response.json() == {"ticker": "AAPL", "price": "225.5"}
 
 
-def test_buy_updates_cash_and_holdings(client):
+def test_buy_updates_cash_and_holdings(client, auth_headers):
+    headers = auth_headers()
     with _mock_price(225.50):
-        response = client.post("/buy", json={"ticker": "AAPL", "shares": 2})
+        response = client.post(
+            "/buy", json={"ticker": "AAPL", "shares": 2}, headers=headers
+        )
 
     assert response.status_code == 200
     trade = response.json()
@@ -29,12 +32,13 @@ def test_buy_updates_cash_and_holdings(client):
     assert trade["shares"] == 2
 
 
-def test_buy_fails_cleanly_when_price_lookup_fails(client, db_session_factory):
+def test_buy_fails_cleanly_when_price_lookup_fails(client, auth_headers, db_session_factory):
+    headers = auth_headers()
     with patch(
         "app.routers.trading.prices.get_price",
         side_effect=HTTPException(status_code=503, detail="Price service unavailable"),
     ):
-        response = client.post("/buy", json={"ticker": "AAPL", "shares": 2})
+        response = client.post("/buy", json={"ticker": "AAPL", "shares": 2}, headers=headers)
 
     assert response.status_code == 503
 
@@ -47,21 +51,23 @@ def test_buy_fails_cleanly_when_price_lookup_fails(client, db_session_factory):
         db.close()
 
 
-def test_sell_updates_cash_and_holdings(client):
+def test_sell_updates_cash_and_holdings(client, auth_headers):
+    headers = auth_headers()
     with _mock_price(225.50):
-        client.post("/buy", json={"ticker": "AAPL", "shares": 2})
-        response = client.post("/sell", json={"ticker": "AAPL", "shares": 1})
+        client.post("/buy", json={"ticker": "AAPL", "shares": 2}, headers=headers)
+        response = client.post("/sell", json={"ticker": "AAPL", "shares": 1}, headers=headers)
 
     assert response.status_code == 200
     assert response.json()["shares"] == 1
 
 
-def test_portfolio_shows_live_market_value(client):
+def test_portfolio_shows_live_market_value(client, auth_headers):
+    headers = auth_headers()
     with _mock_price(225.50):
-        client.post("/buy", json={"ticker": "AAPL", "shares": 2})
+        client.post("/buy", json={"ticker": "AAPL", "shares": 2}, headers=headers)
 
     with patch("app.routers.portfolio.prices.get_price", return_value=Decimal("250.00")):
-        response = client.get("/portfolio")
+        response = client.get("/portfolio", headers=headers)
 
     assert response.status_code == 200
     holding = response.json()["holdings"][0]

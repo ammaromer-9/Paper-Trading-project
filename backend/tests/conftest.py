@@ -33,3 +33,16 @@ def client():
 @pytest.fixture
 def db_session_factory():
     return SessionLocal
+
+
+@pytest.fixture
+def auth_headers(client):
+    """Signs up a fresh user and returns an Authorization header for them."""
+
+    def _make(email="trader@example.com", password="password123"):
+        client.post("/signup", json={"email": email, "password": password})
+        response = client.post("/login", data={"username": email, "password": password})
+        token = response.json()["access_token"]
+        return {"Authorization": f"Bearer {token}"}
+
+    return _make

@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.routers import portfolio, trading
+from app.routers import auth, portfolio, trading
 
 load_dotenv()
 
@@ -25,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, tags=["auth"])
 app.include_router(trading.router, tags=["trading"])
 app.include_router(portfolio.router, tags=["portfolio"])
 
