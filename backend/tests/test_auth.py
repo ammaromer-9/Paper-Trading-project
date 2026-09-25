@@ -1,15 +1,8 @@
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
 
 import jwt
 
 from app.auth import JWT_ALGORITHM, JWT_SECRET
-
-
-def _mock_price(value):
-    from decimal import Decimal
-
-    return patch("app.routers.trading.prices.get_price", return_value=Decimal(str(value)))
 
 
 def _expired_token(user_id: int) -> str:
@@ -122,21 +115,46 @@ def test_protected_endpoint_rejects_expired_token(client):
     assert response.status_code == 401
 
 
-def test_quote_stays_public(client):
-    with _mock_price(225.50):
-        response = client.get("/quote/aapl")
+def test_protected_endpoint_rejects_token_for_a_deleted_user(client, auth_headers):
+    headers = auth_headers()
+    token = headers["Authorization"].removeprefix("Bearer ")
+    user_id = int(jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])["sub"])
+
+    from app.database import SessionLocal
+    from app import models
+
+    db = SessionLocal()
+    try:
+        db.query(models.User).filter(models.User.id == user_id).delete()
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/portfolio", headers=headers)
+    assert response.status_code == 401
+
+
+def test_quote_stays_public(client, mock_prices):
+    mock_prices({"AAPL": "225.50"})
+    response = client.get("/quote/aapl")
     assert response.status_code == 200
+
+
+def test_root_endpoint_reports_ok(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
 
 
 # --- user isolation -----------------------------------------------------------
 
 
-def test_users_cannot_see_each_others_data(client, auth_headers):
+def test_users_cannot_see_each_others_data(client, auth_headers, mock_prices):
     headers_a = auth_headers("a@example.com", "passwordA1")
     headers_b = auth_headers("b@example.com", "passwordB1")
 
-    with _mock_price(100.00):
-        client.post("/buy", json={"ticker": "AAPL", "shares": 5}, headers=headers_a)
+    mock_prices({"AAPL": "100.00"})
+    client.post("/buy", json={"ticker": "AAPL", "shares": 5}, headers=headers_a)
 
     portfolio_b = client.get("/portfolio", headers=headers_b).json()
     assert portfolio_b["holdings"] == []

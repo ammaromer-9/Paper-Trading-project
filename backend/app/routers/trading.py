@@ -25,7 +25,7 @@ def buy(
     if trade.shares <= 0:
         raise HTTPException(status_code=400, detail="Shares must be a positive integer")
 
-    ticker = trade.ticker.upper()
+    ticker = trade.ticker.strip().upper()
     price = prices.get_price(ticker)
     cost = price * trade.shares
 
@@ -71,7 +71,7 @@ def sell(
     if trade.shares <= 0:
         raise HTTPException(status_code=400, detail="Shares must be a positive integer")
 
-    ticker = trade.ticker.upper()
+    ticker = trade.ticker.strip().upper()
     price = prices.get_price(ticker)
 
     holding = (

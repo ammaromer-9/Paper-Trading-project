@@ -12,6 +12,10 @@ venv/
 *.db
 *.sqlite3
 
+# Test coverage
+.coverage
+htmlcov/
+
 # Node / frontend
 node_modules/
 dist/

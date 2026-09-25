@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -9,6 +9,12 @@ from app.database import get_db
 from app.services import prices
 
 router = APIRouter()
+
+TWO_PLACES = Decimal("0.01")
+
+
+def _round_dollars(amount: Decimal) -> Decimal:
+    return amount.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
 
 
 @router.get("/portfolio", response_model=schemas.PortfolioResponse)
@@ -21,7 +27,7 @@ def get_portfolio(
 
     for holding in user.holdings:
         current_price = prices.get_price(holding.ticker)
-        market_value = current_price * holding.shares
+        market_value = _round_dollars(current_price * holding.shares)
         cost_basis = holding.avg_cost * holding.shares
         gain_loss = market_value - cost_basis
         gain_loss_percent = (gain_loss / cost_basis * 100) if cost_basis else Decimal("0")
@@ -33,8 +39,8 @@ def get_portfolio(
                 avg_cost=holding.avg_cost,
                 current_price=current_price,
                 market_value=market_value,
-                gain_loss=gain_loss,
-                gain_loss_percent=gain_loss_percent,
+                gain_loss=_round_dollars(gain_loss),
+                gain_loss_percent=_round_dollars(gain_loss_percent),
             )
         )
         holdings_value += market_value
@@ -54,6 +60,6 @@ def get_trades(
     return (
         db.query(models.Trade)
         .filter(models.Trade.user_id == user.id)
-        .order_by(models.Trade.timestamp.desc())
+        .order_by(models.Trade.timestamp.desc(), models.Trade.id.desc())
         .all()
     )

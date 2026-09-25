@@ -48,6 +48,15 @@ def test_timeout_returns_503():
     assert "unavailable" in exc_info.value.detail
 
 
+def test_unexpected_status_code_returns_503():
+    with patch("app.services.prices.requests.get", return_value=_mock_response(status_code=500)):
+        with pytest.raises(HTTPException) as exc_info:
+            prices.get_price("AAPL")
+
+    assert exc_info.value.status_code == 503
+    assert "unavailable" in exc_info.value.detail
+
+
 def test_rate_limit_returns_503():
     with patch("app.services.prices.requests.get", return_value=_mock_response(status_code=429)):
         with pytest.raises(HTTPException) as exc_info:
