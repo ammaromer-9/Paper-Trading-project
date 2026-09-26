@@ -81,3 +81,38 @@ pytest
 ```
 
 Tests never call the real Finnhub API — all HTTP calls are mocked.
+
+## Frontend
+
+A React (Vite) app in `frontend/` that talks to the backend above.
+
+1. Install dependencies and copy the example env file:
+
+   ```bash
+   cd frontend
+   npm install
+   cp .env.example .env
+   ```
+
+   `VITE_API_URL` in `.env` defaults to `http://localhost:8000`, which
+   matches the backend's default port — leave it as-is unless you're running
+   the backend somewhere else.
+
+2. Run the dev server (with the backend already running in another
+   terminal):
+
+   ```bash
+   npm run dev
+   ```
+
+   The app is then available at `http://localhost:5173`.
+
+3. Build for production:
+
+   ```bash
+   npm run build
+   ```
+
+## Screenshots
+
+_Add screenshots of the app here._

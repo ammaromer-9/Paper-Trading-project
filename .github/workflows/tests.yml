@@ -1,4 +1,4 @@
-name: Backend tests
+name: Tests
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [paper-trading-app]
 
 jobs:
-  test:
+  backend-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,3 +24,23 @@ jobs:
       - name: Run tests with coverage
         working-directory: backend
         run: python -m pytest --cov=app --cov-report=term-missing
+
+  frontend-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build

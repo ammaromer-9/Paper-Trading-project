@@ -4,8 +4,10 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import PublicOnlyRoute from "./components/PublicOnlyRoute";
 import { useAuth } from "./AuthContext";
 import Dashboard from "./pages/Dashboard";
+import History from "./pages/History";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Trade from "./pages/Trade";
 
 export default function App() {
   const { isAuthenticated } = useAuth();
@@ -22,6 +24,8 @@ export default function App() {
 
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/trade" element={<Trade />} />
+            <Route path="/history" element={<History />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
