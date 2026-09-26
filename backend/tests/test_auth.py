@@ -140,6 +140,32 @@ def test_quote_stays_public(client, mock_prices):
     assert response.status_code == 200
 
 
+def test_health_endpoint_reports_ok_when_database_is_reachable(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_health_endpoint_reports_503_when_database_is_unreachable(client):
+    from app.database import get_db
+    from app.main import app as fastapi_app
+
+    def broken_get_db():
+        class BrokenSession:
+            def execute(self, *args, **kwargs):
+                raise Exception("connection refused")
+
+        yield BrokenSession()
+
+    fastapi_app.dependency_overrides[get_db] = broken_get_db
+    try:
+        response = client.get("/health")
+    finally:
+        fastapi_app.dependency_overrides.pop(get_db, None)
+
+    assert response.status_code == 503
+
+
 def test_root_endpoint_reports_ok(client):
     response = client.get("/")
     assert response.status_code == 200

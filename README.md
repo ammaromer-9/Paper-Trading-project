@@ -113,6 +113,77 @@ A React (Vite) app in `frontend/` that talks to the backend above.
    npm run build
    ```
 
+## Deployment
+
+### Environment variables
+
+The backend is entirely configured through environment variables (see
+`backend/.env.example` for the full list with comments). Two are required —
+the app refuses to start without them:
+
+| Variable | Required? | Purpose |
+|---|---|---|
+| `DATABASE_URL` | No (defaults to local SQLite) | `sqlite:///./paper_trading.db` locally, or a `postgresql://user:password@host:5432/dbname` URL in production |
+| `JWT_SECRET` | **Yes** | Signs login tokens |
+| `FINNHUB_API_KEY` | **Yes** | Live stock prices |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No (defaults to 60) | How long a login token stays valid |
+| `CORS_ORIGINS` | No (defaults to the local Vite dev server) | Comma-separated list of frontend origins allowed to call the API |
+
+### Database: SQLite vs. PostgreSQL
+
+The same code works against either — SQLAlchemy picks the right driver from
+the `DATABASE_URL` scheme (`sqlite://` vs. `postgresql://`), and the model
+columns use `Numeric`, not `Float`, so money stays an exact decimal in both
+SQLite and PostgreSQL (PostgreSQL's `NUMERIC` type is exact, unlike a
+floating-point type).
+
+There's no migration tool (like Alembic) in this project — on startup, the
+app just creates any tables that don't already exist
+(`Base.metadata.create_all`) and leaves existing ones alone. That's fine
+while the schema is simple and you're the only one touching the database.
+A migration tool becomes worth adding once you need to **change** an
+existing table in production without losing data — e.g. adding a new
+required column to a table that already has rows, renaming a column, or
+coordinating a schema change across multiple running app instances. Alembic
+generates versioned scripts for exactly that: each migration knows how to
+apply a change and how to undo it, so you can upgrade (or roll back)
+production safely instead of hand-editing the database.
+
+### Health check
+
+`GET /health` returns `{"status": "ok"}` if the app can reach its database,
+or a 503 if it can't. Point your host's health check (e.g. an AWS load
+balancer or ECS task definition) at this endpoint so it knows when the app
+is actually ready to serve traffic, not just that the process started.
+
+### Docker
+
+```bash
+cd backend
+docker build -t paper-trading-backend .
+docker run --env-file .env -p 8000:8000 paper-trading-backend
+```
+
+The `Dockerfile`:
+- Starts from `python:3.13-slim` — a small image with just enough Debian and
+  Python to run the app, not the full-size default image.
+- Creates a non-root user (`appuser`) and switches to it before running the
+  app, so a compromised container process doesn't run as root.
+- Copies `requirements.txt` and installs dependencies *before* copying the
+  app code, so Docker can reuse that (slow) layer from cache when only your
+  code changes, not your dependencies.
+- Copies the `app/` directory in, owned by `appuser`.
+- Runs `uvicorn` bound to `0.0.0.0` (so it's reachable from outside the
+  container) on port 8000, without `--reload` (that's a dev-only feature
+  that watches files for changes — unnecessary overhead in production).
+
+`.dockerignore` keeps `.env`, the local SQLite file, `.venv`, caches, and
+`tests/` out of the image — none of that belongs in a production container.
+
+**Don't have Docker installed?** Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+(Mac/Windows) or Docker Engine (Linux), then come back to test the image
+locally before deploying.
+
 ## Screenshots
 
 _Add screenshots of the app here._

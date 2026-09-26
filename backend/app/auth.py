@@ -18,7 +18,7 @@ if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET is not set. Add it to backend/.env (see .env.example).")
 
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
 # Points Swagger's "Authorize" button at /login, which returns the token it sends back.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
