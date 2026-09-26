@@ -34,7 +34,12 @@ market prices and track a virtual portfolio.
    uvicorn app.main:app --reload
    ```
 
-   The API docs are then available at `http://localhost:8000/docs`.
+   The API docs are then available at `http://localhost:8000/api/docs`.
+
+   Every route is served under `/api` (e.g. `/api/signup`, `/api/quote/{ticker}`)
+   so that in production, one CloudFront distribution can route `/api/*` to
+   this backend and everything else to the S3-hosted frontend, both under a
+   single domain. See [Deployment](#deployment) below.
 
 ### Getting a Finnhub API key
 
@@ -51,26 +56,27 @@ The free tier is plenty for development; the app also caches each price for
 
 ## Authentication
 
-Every endpoint except `GET /quote/{ticker}` requires a logged-in user.
+Every endpoint except `GET /api/quote/{ticker}` requires a logged-in user.
 
-1. **Sign up** — `POST /signup` with a JSON body of `email` and `password`
-   (password must be at least 8 characters). New accounts start with
-   $10,000.00 in cash.
-2. **Log in** — `POST /login` with the email and password (as form fields,
-   not JSON) to get back a JWT access token that expires after 60 minutes.
+1. **Sign up** — `POST /api/signup` with a JSON body of `email` and
+   `password` (password must be at least 8 characters). New accounts start
+   with $10,000.00 in cash.
+2. **Log in** — `POST /api/login` with the email and password (as form
+   fields, not JSON) to get back a JWT access token that expires after 60
+   minutes by default.
 3. **Use the token** — send it as `Authorization: Bearer <token>` on every
    other request.
 
-### Using the Authorize button in `/docs`
+### Using the Authorize button in `/api/docs`
 
-1. Go to `http://localhost:8000/docs`.
-2. Open `POST /signup` and create an account (or use one you already made).
+1. Go to `http://localhost:8000/api/docs`.
+2. Open `POST /api/signup` and create an account (or use one you already made).
 3. Click the **Authorize** button near the top of the page.
 4. In the dialog, enter your email in the **username** field and your
    password in the **password** field, then click **Authorize**.
-5. Close the dialog. Every request you send from `/docs` now includes your
-   token automatically, so `/buy`, `/sell`, `/portfolio`, and `/trades` will
-   work.
+5. Close the dialog. Every request you send from `/api/docs` now includes
+   your token automatically, so `/api/buy`, `/api/sell`, `/api/portfolio`,
+   and `/api/trades` will work.
 6. To "log out", click **Authorize** again and then **Logout**.
 
 ## Tests
@@ -94,9 +100,16 @@ A React (Vite) app in `frontend/` that talks to the backend above.
    cp .env.example .env
    ```
 
-   `VITE_API_URL` in `.env` defaults to `http://localhost:8000`, which
-   matches the backend's default port — leave it as-is unless you're running
-   the backend somewhere else.
+   `VITE_API_URL` in `.env` defaults to `http://localhost:8000/api` for
+   local development, matching the backend above. Vite reads this at
+   **build time**, not runtime — it gets compiled directly into the
+   JavaScript bundle. In production, the frontend and backend share one
+   domain behind CloudFront (see [Deployment](#deployment)), so the
+   production build instead uses a relative path:
+
+   ```bash
+   VITE_API_URL=/api npm run build
+   ```
 
 2. Run the dev server (with the backend already running in another
    terminal):
@@ -129,6 +142,12 @@ the app refuses to start without them:
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | No (defaults to 60) | How long a login token stays valid |
 | `CORS_ORIGINS` | No (defaults to the local Vite dev server) | Comma-separated list of frontend origins allowed to call the API |
 
+`CORS_ORIGINS` only matters for local development, where the frontend
+(`localhost:5173`) and backend (`localhost:8000`) are different origins. In
+production the frontend and `/api/*` are served from the same CloudFront
+domain, so the browser treats every request as same-origin and never
+triggers CORS in the first place.
+
 ### Database: SQLite vs. PostgreSQL
 
 The same code works against either — SQLAlchemy picks the right driver from
@@ -151,7 +170,7 @@ production safely instead of hand-editing the database.
 
 ### Health check
 
-`GET /health` returns `{"status": "ok"}` if the app can reach its database,
+`GET /api/health` returns `{"status": "ok"}` if the app can reach its database,
 or a 503 if it can't. Point your host's health check (e.g. an AWS load
 balancer or ECS task definition) at this endpoint so it knows when the app
 is actually ready to serve traffic, not just that the process started.
@@ -183,6 +202,30 @@ The `Dockerfile`:
 **Don't have Docker installed?** Install [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 (Mac/Windows) or Docker Engine (Linux), then come back to test the image
 locally before deploying.
+
+### CloudFront routing
+
+One CloudFront distribution sits in front of everything: the default
+behavior serves the React build from an S3 bucket, and a `/api/*` behavior
+routes to the EC2 instance running the backend container. Same domain for
+both, which is also why `CORS_ORIGINS` isn't needed in production (see
+above).
+
+That setup needs one extra piece: React Router handles routes like
+`/dashboard` entirely client-side, and there's no actual `/dashboard` file
+in the S3 bucket. Refreshing the page on a route like that would normally
+ask S3 for a file that doesn't exist and get a 404. `deploy/cloudfront-spa-rewrite.js`
+is a CloudFront Function that rewrites any request for a path with no file
+extension to `/index.html` instead, so the app's JavaScript loads and React
+Router takes it from there.
+
+Attach this function to the S3 (default) behavior only, as a **viewer
+request** function - never to `/api/*`. A tempting alternative is
+CloudFront's built-in "custom error responses" (e.g. turn a 403/404 into
+`/index.html`), but that setting applies to the *whole distribution*, not
+one behavior - it would also catch a real 404 from the API, like `/api/quote/ZZZZ`
+returning "Ticker not found", and silently turn it into an HTML page instead
+of the JSON error the frontend expects.
 
 ## Screenshots
 

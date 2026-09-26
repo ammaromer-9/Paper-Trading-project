@@ -43,4 +43,8 @@ jobs:
 
       - name: Build
         working-directory: frontend
+        # Matches the production setup: frontend and backend share one
+        # domain behind CloudFront, so the API is a relative path.
+        env:
+          VITE_API_URL: /api
         run: npm run build
