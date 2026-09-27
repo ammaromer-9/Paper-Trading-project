@@ -3,6 +3,15 @@
 A paper (simulated) stock trading API. Buy and sell fake shares with real
 market prices and track a virtual portfolio.
 
+## Live Demo
+
+**https://d98o1wtikf6a7.cloudfront.net/**
+
+Log in with the demo account (`demo@papertrading.app`) - see
+`deploy/DEPLOYMENT.md` for how to retrieve its password. Deployed on AWS
+(CloudFront + S3 + EC2 + RDS); see `deploy/DEPLOYMENT.md` for the full
+architecture.
+
 ## Setup
 
 1. Create a virtual environment and install dependencies:
