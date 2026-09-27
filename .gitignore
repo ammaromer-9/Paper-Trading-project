@@ -20,6 +20,9 @@ htmlcov/
 node_modules/
 dist/
 
+# Deployment state (resource IDs, no secrets - still local-only)
+deploy/.deploy-state
+
 # Editors / OS
 .vscode/
 .idea/
